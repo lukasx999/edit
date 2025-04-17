@@ -122,7 +122,7 @@ type SDLResult<T> = Result<T, SDLError>;
 
 fn render_buf(buf: &Buffer, renderer: &mut Renderer) -> SDLResult<()> {
 
-    let font = "src/jetbrainsmono/JetBrainsMono-Regular.ttf";
+    let font = "src/fonts/jetbrainsmono.ttf";
     let fontheight: usize = 64;
 
     // TODO: non-monospace fonts
