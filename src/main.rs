@@ -1,23 +1,42 @@
 #![allow(dead_code, unused_imports)]
 
 mod edit;
-use edit::{Buffer, Mode, Editor};
+use edit::{Buffer, Editor};
 
 use thiserror::Error;
 
 use sdl2::{
-    pixels::Color,
-    render::{Canvas, WindowCanvas},
-    rect::Rect,
-    video::WindowContext,
-    ttf::Font,
-    keyboard::Keycode,
-    event::Event
+    event::Event, pixels::Color, rect::Rect, render::WindowCanvas, sys::ttf, ttf::{Font, Sdl2TtfContext}, video::WindowContext
 };
+
+
+type DynError = Box<dyn std::error::Error>;
 
 
 const WIDTH:  u32 = 1600;
 const HEIGHT: u32 = 900;
+
+
+
+
+#[derive(Error, Debug)]
+enum RendererError {
+    #[error("font-related error")]
+    FontError(#[from] sdl2::ttf::FontError),
+    #[error("error as a string")]
+    StringError(String),
+    #[error("texture value error")]
+    TextureValueError(#[from] sdl2::render::TextureValueError)
+}
+
+impl From<String> for RendererError {
+    fn from(value: String) -> Self {
+        Self::StringError(value)
+    }
+}
+
+type RendererResult<T> = Result<T, RendererError>;
+
 
 
 struct Renderer {
@@ -25,12 +44,11 @@ struct Renderer {
     pub video:           sdl2::VideoSubsystem,
     pub canvas:          WindowCanvas,
     pub texture_creator: sdl2::render::TextureCreator<WindowContext>,
-    pub ttf:             sdl2::ttf::Sdl2TtfContext,
     pub event_pump:      sdl2::EventPump,
 }
 
 impl Renderer {
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> RendererResult<Self> {
 
         let sdl = sdl2::init()?;
         let video = sdl.video()?;
@@ -47,12 +65,11 @@ impl Renderer {
             .unwrap();
 
         Ok(Self {
-            ttf:             sdl2::ttf::init().unwrap(),
             texture_creator: canvas.texture_creator(),
-            event_pump:      sdl.event_pump()?,
+            event_pump: sdl.event_pump()?,
             video,
             canvas,
-            sdl,
+            sdl
         })
 
     }
@@ -62,24 +79,19 @@ impl Renderer {
         text:     &str,
         x:        i32,
         y:        i32,
-        fontsize: u16,
-        fontname: &str,
         color:    Color,
-    ) -> SDLResult<()> {
-
-        let font = self.ttf.load_font(fontname, fontsize)?;
+        font:     &Font,
+    ) -> RendererResult<()> {
 
         let surface = font
             .render(text)
             .solid(color)?;
 
         let texture = self.texture_creator
-            .create_texture_from_surface(&surface)
-            .unwrap();
+            .create_texture_from_surface(&surface)?;
 
         let rect = Rect::new(x, y, surface.width(), surface.height());
-        self.canvas.copy(&texture, None, Some(rect))
-            .unwrap();
+        self.canvas.copy(&texture, None, Some(rect))?;
 
         Ok(())
     }
@@ -91,7 +103,7 @@ impl Renderer {
         width:  u32,
         height: u32,
         color:  Color
-    ) -> SDLResult<()> {
+    ) -> RendererResult<()> {
 
         self.canvas.set_draw_color(color);
         let rect = Rect::new(x, y, width, height);
@@ -100,54 +112,56 @@ impl Renderer {
         Ok(())
     }
 
+    pub fn clear(&mut self, color: Color) {
+        self.canvas.set_draw_color(color);
+        self.canvas.clear();
+    }
+
 }
 
-#[derive(Error, Debug)]
-enum SDLError {
-    #[error("font-related error")]
-    FontError(#[from] sdl2::ttf::FontError),
-    #[error("error as a string")]
-    StringError(String),
+struct TtfFont<'a> {
+    height: u16,
+    font: Font<'a, 'a>,
 }
 
-impl From<String> for SDLError {
-    fn from(value: String) -> Self {
-        Self::StringError(value)
+impl<'a> TtfFont<'a> {
+    pub fn new(
+        ttf:    &'a Sdl2TtfContext,
+        name:   &str,
+        height: u16
+    ) -> Result<Self, String> {
+        Ok(Self {
+            height,
+            font: ttf.load_font(name, height)?,
+        })
     }
 }
 
-type SDLResult<T> = Result<T, SDLError>;
 
 
 
-fn render_buf(buf: &Buffer, renderer: &mut Renderer) -> SDLResult<()> {
-
-    let font = "src/fonts/jetbrainsmono.ttf";
-    let fontheight: usize = 64;
+fn render_buf(buf: &Buffer, renderer: &mut Renderer, font: &TtfFont) -> RendererResult<()> {
 
     // TODO: non-monospace fonts
-    let fontwidth = {
-        let f = renderer.ttf.load_font(font, fontheight as u16)?;
-        f.size_of_char('X')?.0
-    };
+    let fontwidth = font.font.size_of_char('X')?.0;
 
     for (i, line) in buf.lines.iter().enumerate() {
 
         if buf.cursor_line == i {
             renderer.render_rect(
                 0,
-                (i*fontheight) as i32,
+                (i*font.height as usize) as i32,
                 WIDTH,
-                fontheight as u32,
+                font.height as u32,
                 Color::GRAY
             )?;
         }
 
         renderer.render_rect(
             (buf.cursor_char * fontwidth as usize) as i32,
-            (buf.cursor_line * fontheight) as i32,
-            fontwidth as u32,
-            fontheight as u32,
+            (buf.cursor_line * font.height as usize) as i32,
+            fontwidth,
+            font.height as u32,
             Color::BLUE
         )?;
 
@@ -155,10 +169,9 @@ fn render_buf(buf: &Buffer, renderer: &mut Renderer) -> SDLResult<()> {
             renderer.render_text(
                 line,
                 0,
-                (i*fontheight) as i32,
-                fontheight as u16,
-                font,
-                Color::WHITE
+                (i*font.height as usize) as i32,
+                Color::WHITE,
+                &font.font
             )?;
         }
 
@@ -171,33 +184,36 @@ fn render_buf(buf: &Buffer, renderer: &mut Renderer) -> SDLResult<()> {
 
 
 
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut ed = Editor::new("src/file.txt")?;
-    let mut renderer = Renderer::new()?;
+
+    let mut rd = Renderer::new()?;
+    let ttf = sdl2::ttf::init()?;
+    let font = TtfFont::new(&ttf, "src/fonts/roboto.ttf", 64)?;
+
+    rd.video.text_input();
 
     'running: loop {
-        if let Some(event) = renderer.event_pump.poll_event() {
+        if let Some(event) = rd.event_pump.poll_event() {
 
-            match event {
+            ed.handle_keypress(&event);
 
-                Event::Quit { .. } => break 'running,
-
-                Event::KeyDown { keycode: Some(key), .. } =>
-                ed.handle_keypress(key),
-
-                _ => {}
-
+            if let Event::Quit { .. } = event {
+                break 'running;
             }
+
+            if let Event::TextInput { text, .. } = event {
+                if text == "q" {
+                    break 'running;
+                }
+            }
+
         }
 
-        renderer.canvas.set_draw_color(Color::BLACK);
-        renderer.canvas.clear();
-
-        render_buf(&ed.buf, &mut renderer)?;
-
-        renderer.canvas.present();
+        rd.clear(Color::BLACK);
+        render_buf(&ed.buf, &mut rd, &font)?;
+        rd.canvas.present();
 
     }
 

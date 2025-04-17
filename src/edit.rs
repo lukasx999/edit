@@ -1,4 +1,13 @@
-use sdl2::keyboard::Keycode;
+use sdl2::keyboard::{Keycode, Mod};
+use sdl2::event::Event;
+
+
+#[derive(Debug, Clone, Copy)]
+pub enum Mode {
+    Normal,
+    Insert,
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Editor {
@@ -15,41 +24,79 @@ impl Editor {
         })
     }
 
-    pub fn handle_keypress(&mut self, key: Keycode) {
+    pub fn handle_keypress(&mut self, event: &Event) {
+
         match self.mode {
-            Mode::Normal => self.handle_keypress_normal(key),
-            Mode::Insert => self.handle_keypress_insert(key),
+            Mode::Normal => self.handle_keypress_normal(event),
+            Mode::Insert => self.handle_keypress_insert(event),
         }
     }
 
-    fn handle_keypress_insert(&mut self, key: Keycode) {
+    fn handle_keypress_insert(&mut self, event: &Event) {
 
-        match key {
+        match event {
 
-            Keycode::Escape => {
+            Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                 self.mode = Mode::Normal;
                 self.buf.move_left();
             }
 
-            _ => {
-                self.buf.insert(key.into_i32() as u8 as char);
+            Event::TextInput { text, .. } => {
+                self.buf.insert(text);
                 self.buf.move_right();
             }
 
+            _ => {}
         }
-
     }
 
-    fn handle_keypress_normal(&mut self, key: Keycode) {
 
-        match key {
-            Keycode::J => self.buf.move_down(),
-            Keycode::K => self.buf.move_up(),
-            Keycode::H => self.buf.move_left(),
-            Keycode::L => self.buf.move_right(),
-            Keycode::X => self.buf.delete(),
-            Keycode::D => self.buf.delete_line(),
-            Keycode::I => self.mode = Mode::Insert,
+    fn handle_keypress_normal(&mut self, event: &Event) {
+
+        match event {
+
+            Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
+                self.mode = Mode::Normal;
+                self.buf.move_left();
+            }
+
+            Event::TextInput { text, .. } =>
+            match text.as_str() {
+                "j"       => self.buf.move_down(),
+                "k"       => self.buf.move_up(),
+                "h"       => self.buf.move_left(),
+                "l"       => self.buf.move_right(),
+                "x"       => self.buf.delete_char(),
+                "d"       => self.buf.delete_line(),
+                "0" | "_" => self.buf.move_start_line(),
+                "i"       => self.mode = Mode::Insert,
+                "$"       => self.buf.move_end_line(),
+
+                "I" => {
+                    self.buf.move_start_line();
+                    self.mode = Mode::Insert;
+                }
+
+                "a" => {
+                    self.buf.move_right();
+                    self.mode = Mode::Insert;
+                }
+
+                "A" => {
+                    self.buf.move_end_line();
+                    self.buf.move_right();
+                    self.mode = Mode::Insert;
+                }
+
+                "o" => {
+                    self.buf.move_down();
+                    self.buf.newline();
+                    self.mode = Mode::Insert;
+                }
+
+                _ => {}
+            }
+
             _ => {}
         }
 
@@ -58,56 +105,39 @@ impl Editor {
 }
 
 
-#[derive(Debug, Clone, Copy)]
-pub enum Mode {
-    Normal,
-    Insert,
-}
 
-
-
-
-
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Buffer {
     pub cursor_char: usize,
     pub cursor_line: usize,
     pub lines: Vec<String>,
 }
 
-impl Default for Buffer {
-    fn default() -> Self {
-        Self {
-            cursor_char: 0,
-            cursor_line: 0,
-            lines: Vec::new(),
-        }
-    }
-}
-
 impl Buffer {
 
     pub fn from_file(filename: &str) -> std::io::Result<Self> {
+
         let lines = std::fs::read_to_string(filename)?
             .lines()
             .map(|elem| elem.to_string())
             .collect();
-        Ok(Self {
-            lines,
-            ..Default::default()
-        })
+
+        Ok(Self { lines, ..Default::default() })
     }
 
-    pub fn insert(&mut self, c: char) {
-        self.lines[self.cursor_line].insert(self.cursor_char, c);
+    pub fn newline(&mut self) {
+        self.lines.insert(self.cursor_line, String::new());
+    }
+
+    pub fn insert(&mut self, s: &str) {
+        self.lines[self.cursor_line].insert_str(self.cursor_char, s);
     }
 
     pub fn delete_line(&mut self) {
         self.lines.remove(self.cursor_line);
     }
 
-    pub fn delete(&mut self) {
+    pub fn delete_char(&mut self) {
         self.lines[self.cursor_line].remove(self.cursor_char);
     }
 
@@ -125,6 +155,14 @@ impl Buffer {
 
     pub fn move_left(&mut self) {
         self.cursor_char -= 1;
+    }
+
+    pub fn move_start_line(&mut self) {
+        self.cursor_char = 0;
+    }
+
+    pub fn move_end_line(&mut self) {
+        self.cursor_char = self.lines[self.cursor_line].len()-1;
     }
 
 }
