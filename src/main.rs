@@ -67,21 +67,18 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont, bounds: Rect) ->
 
         }
 
-        let mut l = line.as_str();
-        while font.font.size_of(&l)?.0 as i32 > bounds.w {
-            l = &l[..l.len()-1];
+        // get slice of line that is small enough to render
+        let mut line_slice = line.as_str();
+        while font.font.size_of(&line_slice)?.0 as i32 > bounds.w {
+            line_slice = &line_slice[..line_slice.len()-1];
         }
-
-        // while font.font.size_of(&l)?.0 as i32 > bounds.w {
-        //     l.pop();
-        // }
 
         // text
         if !line.is_empty() { // SDL cant render zero width text
             renderer.render_text(
                 bounds.x,
                 bounds.y + (i * font.height as usize) as i32,
-                &l,
+                &line_slice,
                 Color::WHITE,
                 &font.font
             )?;
