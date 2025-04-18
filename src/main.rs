@@ -32,7 +32,13 @@ const CURSOR_SIZE: u32 = 3;
 
 fn render_statusbar(ed: &Editor, rd: &mut Renderer, font: &TtfFont, bounds: Rect) -> RendererResult<()> {
 
-    rd.render_text(bounds.x, bounds.y, ed.mode.to_string(), Color::RED, &font.font)?;
+    rd.render_text(
+        bounds.x,
+        bounds.y,
+        ed.mode.to_string(),
+        Color::RED,
+        &font.font
+    )?;
 
     Ok(())
 }
