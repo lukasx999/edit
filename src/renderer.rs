@@ -72,13 +72,13 @@ impl Renderer {
         &mut self,
         x:        i32,
         y:        i32,
-        text:     &str,
+        text:     impl AsRef<str>,
         color:    Color,
         font:     &Font,
     ) -> RendererResult<()> {
 
         let surface = font
-            .render(text)
+            .render(text.as_ref())
             .solid(color)?;
 
         let texture = self.texture_creator

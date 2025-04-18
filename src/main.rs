@@ -21,8 +21,8 @@ use sdl2::{
 
 const WIDTH:  u32 = 1600;
 const HEIGHT: u32 = 900;
-// const FONTPATH: &str = "src/fonts/roboto.ttf";
-const FONTPATH: &str = "src/fonts/jetbrainsmono.ttf";
+const FONTPATH: &str = "src/fonts/roboto.ttf";
+// const FONTPATH: &str = "src/fonts/jetbrainsmono.ttf";
 const FONTSIZE: u16 = 46;
 const FILEPATH: &str = "src/file.txt";
 const CURSOR_SIZE: u32 = 3;
@@ -30,34 +30,44 @@ const CURSOR_SIZE: u32 = 3;
 
 
 
+fn render_statusbar(ed: &Editor, rd: &mut Renderer, font: &TtfFont, bounds: Rect) -> RendererResult<()> {
 
-fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont, bounds: Rect) -> RendererResult<()> {
+    rd.render_text(bounds.x, bounds.y, ed.mode.to_string(), Color::RED, &font.font)?;
+
+    Ok(())
+}
+
+fn render_buf(ed: &Editor, rd: &mut Renderer, font: &TtfFont, bounds: Rect) -> RendererResult<()> {
     let buf = &ed.buf;
 
-    for (i, line) in buf.lines.iter().enumerate() {
+    // the amount of lines that can fit onto the screen
+    let linecount = (bounds.h / font.height as i32) as usize;
+
+    for (i, line) in buf.lines[..linecount].iter().enumerate() {
 
         // cursorline
         if buf.cursor_line as usize == i {
 
-            renderer.render_rect(
+            rd.render_rect(
                 bounds.x,
                 bounds.y + (i * font.height as usize) as i32,
-                WIDTH,
+                bounds.w as u32,
                 font.height as u32,
                 Color::GRAY
             )?;
+
 
             // width of all chars leading up to cursor
             let widthsum = font.font.size_of(&line[..buf.cursor_char as usize])?.0;
 
             // width of current char
-            let charwidth = font.font.size_of_char(buf.current_char())?.0;
-
-            // we have to do it like that, to support non-monospace fonts
-            let cursor = if ed.mode == Mode::Normal { charwidth } else { CURSOR_SIZE };
+            let cursor = match buf.current_char() {
+                Some(c) if ed.mode == Mode::Normal => font.font.size_of_char(c)?.0,
+                _    => CURSOR_SIZE,
+            };
 
             // char cursor
-            renderer.render_rect(
+            rd.render_rect(
                 bounds.x + widthsum as i32,
                 bounds.y + (buf.cursor_line * font.height as isize) as i32,
                 cursor,
@@ -75,7 +85,7 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont, bounds: Rect) ->
 
         // text
         if !line.is_empty() { // SDL cant render zero width text
-            renderer.render_text(
+            rd.render_text(
                 bounds.x,
                 bounds.y + (i * font.height as usize) as i32,
                 &line_slice,
@@ -83,6 +93,7 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont, bounds: Rect) ->
                 &font.font
             )?;
         }
+
 
 
     }
@@ -121,7 +132,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         rd.clear(Color::BLACK);
-        render(&ed, &mut rd, &font, Rect::new(100, 100, 200, 200))?;
+
+        let rect_buf = Rect::new(100, 100, 1000, 200);
+        rd.canvas.set_draw_color(Color::GRAY);
+        rd.canvas.draw_rect(rect_buf)?;
+        render_buf(&ed, &mut rd, &font, rect_buf)?;
+
+        let rect_mode = Rect::new(0, 0, 200, 200);
+        render_statusbar(&ed, &mut rd, &font, rect_mode)?;
+
         rd.canvas.present();
 
     }

@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::fs;
+use std::fmt::Display;
 
 use sdl2::keyboard::{Keycode, Mod};
 use sdl2::event::Event;
@@ -11,6 +12,18 @@ pub enum Mode {
     Normal,
     Insert,
 }
+
+impl Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let fmt = match self {
+            Mode::Normal => "normal",
+            Mode::Insert => "insert",
+        };
+        write!(f, "{}", fmt)
+    }
+}
+
+
 
 #[derive(Debug, Clone)]
 pub struct Editor {
@@ -162,7 +175,6 @@ impl Buffer {
     }
 
     pub fn save_to_file(&self, filename: &str) -> std::io::Result<()> {
-
         let buf = self.lines.join("\n");
 
         fs::File::options()
@@ -204,13 +216,11 @@ impl Buffer {
         self.lines[self.cursor_line as usize].is_empty()
     }
 
-    // if current char is not valid, returns ' '
-    pub fn current_char(&self) -> char {
-        let line = &self.lines[self.cursor_line as usize];
-        line
+    // returns None if cursor is out-of-bounds because of append mode
+    pub fn current_char(&self) -> Option<char> {
+        self.lines[self.cursor_line as usize]
             .chars()
             .nth(self.cursor_char as usize)
-            .unwrap_or(' ')
     }
 
     pub fn newline_above(&mut self) {
