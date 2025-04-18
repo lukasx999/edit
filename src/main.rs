@@ -1,7 +1,7 @@
 #![allow(dead_code, unused_imports)]
 
 mod edit;
-use edit::{Buffer, Editor};
+use edit::{Buffer, Editor, Mode};
 
 mod renderer;
 use renderer::{Renderer, RendererResult, RendererError, TtfFont};
@@ -21,19 +21,18 @@ use sdl2::{
 
 const WIDTH:  u32 = 1600;
 const HEIGHT: u32 = 900;
-const FONTPATH: &str = "src/fonts/roboto.ttf";
-// const FONTPATH: &str = "src/fonts/jetbrainsmono.ttf";
+// const FONTPATH: &str = "src/fonts/roboto.ttf";
+const FONTPATH: &str = "src/fonts/jetbrainsmono.ttf";
 const FONTSIZE: u16 = 46;
 const FILEPATH: &str = "src/file.txt";
+const CURSOR_SIZE: u32 = 3;
 
 
 
 
 
-
-
-
-fn render_buf(buf: &Buffer, renderer: &mut Renderer, font: &TtfFont) -> RendererResult<()> {
+fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont) -> RendererResult<()> {
+    let buf = &ed.buf;
 
     for (i, line) in buf.lines.iter().enumerate() {
 
@@ -55,12 +54,13 @@ fn render_buf(buf: &Buffer, renderer: &mut Renderer, font: &TtfFont) -> Renderer
             let charwidth = font.font.size_of_char(buf.current_char())?.0;
 
             // we have to do it like that, to support non-monospace fonts
+            let cursor = if ed.mode == Mode::Normal { charwidth } else { CURSOR_SIZE };
 
             // char cursor
             renderer.render_rect(
                 widthsum as i32,
                 (buf.cursor_line * font.height as isize) as i32,
-                charwidth,
+                cursor,
                 font.height as u32,
                 Color::BLUE
             )?;
@@ -116,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         rd.clear(Color::BLACK);
-        render_buf(&ed.buf, &mut rd, &font)?;
+        render(&ed, &mut rd, &font)?;
         rd.canvas.present();
 
     }

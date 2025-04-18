@@ -6,7 +6,7 @@ use sdl2::event::Event;
 
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Mode {
     Normal,
     Insert,
@@ -27,6 +27,17 @@ impl Editor {
         })
     }
 
+    fn mode_normal(&mut self) {
+        self.mode = Mode::Normal;
+    }
+
+    fn mode_insert(&mut self) {
+        self.mode = Mode::Insert;
+        if self.buf.is_current_line_empty() {
+            self.buf.append = true;
+        }
+    }
+
     pub fn handle_keypress(&mut self, event: &Event) {
         match self.mode {
             Mode::Normal => self.handle_keypress_normal(event),
@@ -39,7 +50,8 @@ impl Editor {
         match event {
 
             Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                self.mode = Mode::Normal;
+                self.mode_normal();
+                self.buf.append = false;
                 self.buf.move_left();
             }
 
@@ -52,17 +64,9 @@ impl Editor {
         }
     }
 
-
     fn handle_keypress_normal(&mut self, event: &Event) {
 
-        match event {
-
-            Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                self.mode = Mode::Normal;
-                self.buf.move_left();
-            }
-
-            Event::TextInput { text, .. } =>
+        if let Event::TextInput { text, .. } = event {
             match text.as_str() {
                 "j"       => self.buf.move_down(),
                 "k"       => self.buf.move_up(),
@@ -74,36 +78,40 @@ impl Editor {
                 "$"       => self.buf.move_end_line(),
                 "g"       => self.buf.move_top(),
                 "G"       => self.buf.move_bot(),
-                "i"       => self.mode = Mode::Insert,
                 "w"       => self.buf.save_to_own_file().unwrap(), // TODO: handle error
+                "i"       => self.mode_insert(),
 
                 "I" => {
                     self.buf.move_start_line();
-                    self.mode = Mode::Insert;
+                    self.mode_insert();
                 }
 
                 "a" => {
                     self.buf.move_right();
-                    self.mode = Mode::Insert;
+                    self.mode_insert();
                 }
 
-                // TODO: fix
                 "A" => {
+                    self.buf.append = true;
                     self.buf.move_end_line();
                     self.buf.move_right();
-                    self.mode = Mode::Insert;
+                    self.mode_insert();
+                }
+
+                "O" => {
+                    self.buf.newline_above();
+                    self.mode_insert();
                 }
 
                 "o" => {
+                    self.buf.newline_below();
                     self.buf.move_down();
-                    self.buf.newline();
-                    self.mode = Mode::Insert;
+                    self.mode_insert();
                 }
 
                 _ => {}
             }
 
-            _ => {}
         }
 
     }
@@ -119,6 +127,10 @@ pub struct Buffer {
     pub cursor_char: isize,
     pub cursor_line: isize,
     pub lines: Vec<String>,
+    // append mode, allows the cursor to be out-of-bounds
+    // by one char at the end of the line
+    // used by `A`, and `a` at end of line
+    pub append: bool, 
 }
 
 impl Buffer {
@@ -154,8 +166,8 @@ impl Buffer {
         let buf = self.lines.join("\n");
 
         fs::File::options()
-            .truncate(true)
             .write(true)
+            .truncate(true)
             .open(filename)?
             .write_all(buf.as_bytes())?;
 
@@ -164,10 +176,22 @@ impl Buffer {
 
     fn check_cursor(&mut self) {
 
-        let line_len = self.lines[self.cursor_line as usize].len() as isize;
+        if self.cursor_line < 0 {
+            self.cursor_line = 0;
+        }
 
-        if self.cursor_char >= line_len {
-            self.cursor_char = line_len - 1;
+        let line_count = self.lines.len() as isize;
+
+        if self.cursor_line >= line_count {
+            self.cursor_line = line_count - 1;
+        }
+
+        if !self.append {
+            let line_len = self.lines[self.cursor_line as usize].len() as isize;
+
+            if self.cursor_char >= line_len {
+                self.cursor_char = line_len - 1;
+            }
         }
 
         if self.cursor_char < 0 {
@@ -176,16 +200,26 @@ impl Buffer {
 
     }
 
+    pub fn is_current_line_empty(&self) -> bool {
+        self.lines[self.cursor_line as usize].is_empty()
+    }
+
+    // if current char is not valid, returns ' '
     pub fn current_char(&self) -> char {
         let line = &self.lines[self.cursor_line as usize];
         line
             .chars()
             .nth(self.cursor_char as usize)
-            .unwrap()
+            .unwrap_or(' ')
     }
 
-    pub fn newline(&mut self) {
+    pub fn newline_above(&mut self) {
         self.lines.insert(self.cursor_line as usize, String::new());
+        self.check_cursor();
+    }
+
+    pub fn newline_below(&mut self) {
+        self.lines.insert(self.cursor_line as usize + 1, String::new());
         self.check_cursor();
     }
 
@@ -196,6 +230,7 @@ impl Buffer {
 
     pub fn delete_line(&mut self) {
         self.lines.remove(self.cursor_line as usize);
+        self.check_cursor();
     }
 
     pub fn delete_char(&mut self) {
