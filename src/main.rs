@@ -31,7 +31,7 @@ const CURSOR_SIZE: u32 = 3;
 
 
 
-fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont) -> RendererResult<()> {
+fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont, bounds: Rect) -> RendererResult<()> {
     let buf = &ed.buf;
 
     for (i, line) in buf.lines.iter().enumerate() {
@@ -40,8 +40,8 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont) -> RendererResul
         if buf.cursor_line as usize == i {
 
             renderer.render_rect(
-                0,
-                (i * font.height as usize) as i32,
+                bounds.x,
+                bounds.y + (i * font.height as usize) as i32,
                 WIDTH,
                 font.height as u32,
                 Color::GRAY
@@ -58,8 +58,8 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont) -> RendererResul
 
             // char cursor
             renderer.render_rect(
-                widthsum as i32,
-                (buf.cursor_line * font.height as isize) as i32,
+                bounds.x + widthsum as i32,
+                bounds.y + (buf.cursor_line * font.height as isize) as i32,
                 cursor,
                 font.height as u32,
                 Color::BLUE
@@ -67,13 +67,17 @@ fn render(ed: &Editor, renderer: &mut Renderer, font: &TtfFont) -> RendererResul
 
         }
 
+        let mut l = line.clone();
+        while font.font.size_of(&l)?.0 as i32 > bounds.w {
+            l.pop();
+        }
 
         // text
         if !line.is_empty() { // SDL cant render zero width text
             renderer.render_text(
-                0,
-                (i * font.height as usize) as i32,
-                line,
+                bounds.x,
+                bounds.y + (i * font.height as usize) as i32,
+                &l,
                 Color::WHITE,
                 &font.font
             )?;
@@ -116,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         rd.clear(Color::BLACK);
-        render(&ed, &mut rd, &font)?;
+        render(&ed, &mut rd, &font, Rect::new(100, 100, 200, 200))?;
         rd.canvas.present();
 
     }
