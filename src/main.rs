@@ -5,18 +5,15 @@ mod sdlwrap;
 use sdlwrap::{SDLResult, TtfFont, render_text, render_rect, render_text_bounded};
 
 use sdl2::video::Window;
+use sdl2::ttf::Font;
 use sdl2::{event::Event, pixels::Color, rect::Rect, render::WindowCanvas};
 
 
-type DynError = Box<dyn std::error::Error>;
 
-const MONOSPACE: bool = false;
-const FONTPATH: &str = if MONOSPACE {
-    "src/fonts/jetbrainsmono.ttf"
-} else {
-    "src/fonts/roboto.ttf"
-};
-const FONTSIZE: u16 = 50;
+const FONT_BUFFER: &str = "src/fonts/jetbrainsmono.ttf";
+const FONT_STATUS: &str = "src/fonts/roboto.ttf";
+const FONTSIZE_BUFFER: u16 = 50;
+const FONTSIZE_STATUS: u16 = 25;
 const FILEPATH: &str = "src/file.txt";
 const CURSOR_SIZE: u32 = 3;
 const PADDING: u32 = 25;
@@ -66,10 +63,17 @@ impl Layout {
 
 }
 
+struct Widget<'a> {
+    bounds: Rect,
+    font: Box<Font<'a, 'a>>,
+    fontsize: u16,
+}
+
 struct Application {
     cv:     WindowCanvas,
     ed:     Editor,
     layout: Layout,
+    // widgets: Vec<Widget>,
 }
 
 impl Application {
@@ -223,7 +227,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = Application::new(cv, FILEPATH)?;
 
     let ttf = sdl2::ttf::init()?;
-    let font = TtfFont::new(&ttf, FONTPATH, FONTSIZE)?;
+    let font_buf    = TtfFont::new(&ttf, FONT_BUFFER, FONTSIZE_BUFFER)?;
+    let font_status = TtfFont::new(&ttf, FONT_STATUS, FONTSIZE_STATUS)?;
 
 
     'running: loop {
@@ -244,7 +249,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         }
 
-        app.render(&font)?;
+        app.render(&font_buf)?;
 
     }
 
