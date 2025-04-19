@@ -229,15 +229,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             app.ed.handle_keypress(&event);
 
-            if let Event::Quit { .. } = event {
-                break 'running;
+            // if let Event::Quit { .. } = event {
+            //     break 'running;
+            // }
+            //
+            // if let Event::TextInput { text, .. } = event {
+            //     if text == "q" {
+            //         break 'running;
+            //     }
+            // }
+
+            const TEXT: &str = "q";
+            match event {
+                | Event::Quit { .. }
+                | Event::TextInput { text: TEXT, .. } => break 'running,
+                _ => {}
             }
 
-            if let Event::TextInput { text, .. } = event {
-                if text == "q" {
-                    break 'running;
-                }
-            }
+
+
 
         }
 
