@@ -1,8 +1,9 @@
 use std::io::Write;
 use std::fs;
 use std::fmt::Display;
+use std::path::{PathBuf, Path};
 
-use sdl2::keyboard::{Keycode, Mod};
+use sdl2::keyboard::Keycode;
 use sdl2::event::Event;
 
 
@@ -27,8 +28,9 @@ impl Display for Mode {
 
 #[derive(Debug, Clone)]
 pub struct Editor {
-    pub mode: Mode,
-    pub buf: Buffer,
+    pub mode:      Mode,
+    pub buf:       Buffer,
+    pub statusbar: String,
 }
 
 impl Editor {
@@ -37,7 +39,21 @@ impl Editor {
         Ok(Self {
             mode: Mode::Normal,
             buf: Buffer::from_file(filename)?,
+            statusbar: String::new(),
         })
+    }
+
+    pub fn update_statusbar(&mut self) {
+        let filename = match self.buf.filename.as_ref() {
+            Some(path) => path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            None => "<mem>",
+        };
+        let mode = self.mode.to_string();
+        self.statusbar = format!("{mode} | {filename}");
     }
 
     fn mode_normal(&mut self) {
@@ -135,7 +151,7 @@ impl Editor {
 
 #[derive(Debug, Clone, Default)]
 pub struct Buffer {
-    pub filename: Option<String>,
+    pub filename: Option<PathBuf>,
     // cursor must be signed for out-of-bounds checking
     pub cursor_char: isize,
     pub cursor_line: isize,
@@ -150,10 +166,7 @@ impl Buffer {
 
     pub fn from_file(filename: &str) -> std::io::Result<Self> {
 
-        let abspath = fs::canonicalize(filename)?
-            .to_str()
-            .unwrap()
-            .to_string();
+        let abspath = fs::canonicalize(filename)?;
 
         Ok(Self {
             lines: fs::read_to_string(&abspath)?
@@ -167,14 +180,11 @@ impl Buffer {
 
     pub fn save_to_own_file(&self) -> std::io::Result<()> {
         // TODO: error when buffer is not backed by a file
-        self.save_to_file(self.filename
-            .as_ref()
-            .unwrap())?;
-
+        self.save_to_file(self.filename.as_ref().unwrap())?;
         Ok(())
     }
 
-    pub fn save_to_file(&self, filename: &str) -> std::io::Result<()> {
+    pub fn save_to_file(&self, filename: impl AsRef<Path>) -> std::io::Result<()> {
         let buf = self.lines.join("\n");
 
         fs::File::options()

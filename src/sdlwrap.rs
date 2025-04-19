@@ -18,7 +18,11 @@ pub enum SDLError {
     #[error("error as a string")]
     String(String),
     #[error("texture value error")]
-    TextureValue(#[from] sdl2::render::TextureValueError)
+    TextureValue(#[from] sdl2::render::TextureValueError),
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+    #[error("integer or sdl error")]
+    IntOrSdl(#[from] sdl2::IntegerOrSdlError),
 }
 
 impl From<String> for SDLError {
@@ -28,38 +32,6 @@ impl From<String> for SDLError {
 }
 
 pub type SDLResult<T> = Result<T, SDLError>;
-
-
-
-
-pub fn render_text(
-    x:        i32,
-    y:        i32,
-    text:     impl AsRef<str>,
-    cv:       &mut WindowCanvas,
-    color:    Color,
-    font:     &Font,
-) -> SDLResult<()> {
-
-    let surface = font
-        .render(text.as_ref())
-        .solid(color)?;
-
-    let tc = cv.texture_creator();
-    let texture = tc.create_texture_from_surface(&surface)?;
-
-    let rect = Rect::new(x, y, surface.width(), surface.height());
-    cv.copy(&texture, None, Some(rect))?;
-
-    Ok(())
-}
-
-pub fn render_rect(x: i32, y: i32, w: u32, h: u32, color: Color, cv: &mut WindowCanvas) -> SDLResult<()> {
-    cv.set_draw_color(color);
-    cv.draw_rect(Rect::new(x, y, w, h))?;
-    Ok(())
-}
-
 
 
 pub struct TtfFont<'a> {
@@ -78,4 +50,64 @@ impl<'a> TtfFont<'a> {
             font: ttf.load_font(name, height)?,
         })
     }
+}
+
+
+
+pub fn render_text(
+    x:        i32,
+    y:        i32,
+    text:     impl AsRef<str>,
+    cv:       &mut WindowCanvas,
+    color:    Color,
+    font:     &Font,
+) -> SDLResult<()> {
+
+    let surface = font
+        .render(text.as_ref())
+        .solid(color)?;
+
+    let tc = cv.texture_creator();
+    let tex = tc.create_texture_from_surface(&surface)?;
+
+    let rect = Rect::new(x, y, surface.width(), surface.height());
+    cv.copy(&tex, None, Some(rect))?;
+
+    Ok(())
+}
+
+pub fn render_text_bounded(
+    x:        i32,
+    y:        i32,
+    text:     impl AsRef<str>,
+    cv:       &mut WindowCanvas,
+    color:    Color,
+    font:     &Font,
+    maxwidth: i32,
+) -> SDLResult<()> {
+
+
+    // get slice of text that is small enough to render
+    let mut text_slice = text.as_ref();
+    while font.size_of(text_slice)?.0 as i32 > maxwidth {
+        text_slice = &text_slice[..text_slice.len()-1];
+    }
+
+    render_text(x, y, text_slice, cv, color, font)?;
+
+
+    Ok(())
+}
+
+pub fn render_rect(
+    x:     i32,
+    y:     i32,
+    w:     u32,
+    h:     u32,
+    color: Color,
+    cv:    &mut WindowCanvas
+) -> SDLResult<()> {
+    cv.set_draw_color(color);
+    cv.fill_rect(Rect::new(x, y, w, h))?;
+    Ok(())
 }
