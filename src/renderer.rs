@@ -1,5 +1,3 @@
-use crate::{WIDTH, HEIGHT};
-
 use thiserror::Error;
 
 use sdl2::{
@@ -48,7 +46,8 @@ impl Renderer {
         let video = sdl.video()?;
 
         let window = video
-            .window("edit", WIDTH, HEIGHT)
+            .window("edit", 1600, 900)
+            .resizable()
             .position_centered()
             .build()
             .unwrap();
