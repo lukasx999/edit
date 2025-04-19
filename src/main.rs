@@ -46,9 +46,7 @@ impl Default for Layout {
 
 impl Layout {
 
-    pub fn calculate(&mut self, width: u32, height: u32) {
-
-        let status_height = 75;
+    pub fn calculate(&mut self, width: u32, height: u32, status_height: u32) {
 
         self.buffer = Rect::new(
             PADDING as i32,
@@ -61,7 +59,7 @@ impl Layout {
             PADDING as i32,
             (height - status_height - PADDING) as i32,
             width - PADDING * 2,
-            status_height
+            status_height,
         );
 
     }
@@ -173,6 +171,10 @@ impl Application {
 
     }
 
+    pub fn handle_event(&mut self, ev: &Event) {
+        self.ed.handle_keypress(ev);
+    }
+
     pub fn render(&mut self, font: &TtfFont) -> SDLResult<()> {
 
         self.ed.update_statusbar();
@@ -183,7 +185,7 @@ impl Application {
         let (width, height) = self.cv
             .window()
             .size();
-        self.layout.calculate(width, height);
+        self.layout.calculate(width, height, font.height as u32);
 
         self.render_statusline(&font)?;
         self.render_buf(&font)?;
@@ -225,34 +227,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
     'running: loop {
-        if let Some(event) = event_pump.poll_event() {
+        for event in event_pump.poll_iter() {
 
-            app.ed.handle_keypress(&event);
+            app.handle_event(&event);
 
-            // if let Event::Quit { .. } = event {
-            //     break 'running;
-            // }
-            //
-            // if let Event::TextInput { text, .. } = event {
-            //     if text == "q" {
-            //         break 'running;
-            //     }
-            // }
-
-            const TEXT: &str = "q";
-            match event {
-                | Event::Quit { .. }
-                | Event::TextInput { text: TEXT, .. } => break 'running,
-                _ => {}
+            if let Event::Quit { .. } = event {
+                break 'running;
             }
 
-
+            if let Event::TextInput { text, .. } = event {
+                if text == "q" {
+                    break 'running;
+                }
+            }
 
 
         }
 
         app.render(&font)?;
-
 
     }
 
