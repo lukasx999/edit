@@ -76,13 +76,11 @@ struct Application {
 
 impl Application {
 
-    pub fn new(window: Window, filepath: &str) -> SDLResult<Self> {
+    pub fn new(cv: WindowCanvas, filepath: &str) -> SDLResult<Self> {
         Ok(Self {
             layout: Layout::default(),
             ed: Editor::new(filepath)?,
-            cv: window
-                .into_canvas()
-                .build()?,
+            cv,
         })
     }
 
@@ -216,7 +214,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     window.set_minimum_size(500, 500)?;
 
-    let mut app = Application::new(window, FILEPATH)?;
+    let cv = window
+        .into_canvas()
+        .build()?;
+
+    let mut app = Application::new(cv, FILEPATH)?;
 
     let ttf = sdl2::ttf::init()?;
     let font = TtfFont::new(&ttf, FONTPATH, FONTSIZE)?;
